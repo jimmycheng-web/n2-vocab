@@ -45,13 +45,29 @@ const _posLabel = (p) => {
 const GIST_FILE = 'n2-vocab.json';
 const LS_DB = 'n2.db', LS_TOKEN = 'n2.gistToken', LS_GIST = 'n2.gistId', LS_SYNC = 'n2.lastSync';
 
-// 分詞在 Web Worker 執行（下載 + 解壓 17MB 字典時不會凍結畫面）
+// 分詞在 Web Worker 執行（下載 + 解壓 17MB 字典時不會凍結畫面）；以 Blob 建立，不依賴外部檔案
+const WORKER_SRC = `
+importScripts('https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js');
+let tokenizer = null;
+const queue = [];
+function run(msg) {
+  try { postMessage({ type: 'result', id: msg.id, tokens: tokenizer.tokenize(msg.text) }); }
+  catch (e) { postMessage({ type: 'result', id: msg.id, error: String(e && e.message || e) }); }
+}
+kuromoji.builder({ dicPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }).build((err, t) => {
+  if (err) { postMessage({ type: 'error', message: String(err) }); return; }
+  tokenizer = t;
+  postMessage({ type: 'ready' });
+  queue.splice(0).forEach(run);
+});
+onmessage = (e) => { if (tokenizer) run(e.data); else queue.push(e.data); };
+`;
 let _worker = null, _workerReady = false, _seq = 0;
 const _pending = new Map();
 function getWorker(onStatus) {
   if (_worker) return _worker;
   onStatus && onStatus('載入日文字典（約 17MB，只需一次）…');
-  _worker = new Worker('analyze-worker.js');
+  _worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'application/javascript' })));
   _worker.onmessage = (e) => {
     const m = e.data;
     if (m.type === 'ready') { _workerReady = true; onStatus && onStatus(''); return; }
