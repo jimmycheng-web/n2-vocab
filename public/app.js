@@ -292,6 +292,7 @@ function render() {
   renderUnitPicker();
   $$('.nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
   const view = $('#view');
+  view.classList.toggle('narrow', state.view !== 'words');
   view.innerHTML = '';
   const fn = { units: renderUnits, words: renderWords, review: renderReview, quiz: renderQuiz }[state.view] || renderUnits;
   fn(view);
@@ -511,9 +512,9 @@ function renderWords(root) {
       <input type="text" id="search" placeholder="搜尋單字 / 假名 / 中文 / 例句…" value="${esc(state.search)}">
       <label class="small muted"><input type="checkbox" id="rubyToggle" ${state.showRuby ? 'checked' : ''}> 顯示振り仮名</label>
       <label class="small muted">🔊 語音：<select id="ttsSel" style="width:auto;padding:3px 6px"><option value="google" ${(localStorage.getItem('n2.tts') || (N2_STATIC ? 'browser' : 'google')) === 'google' ? 'selected' : ''}>Google 翻譯語音${N2_STATIC ? '（可能被擋，會自動退回）' : ''}</option><option value="browser" ${(localStorage.getItem('n2.tts') || (N2_STATIC ? 'browser' : 'google')) === 'browser' ? 'selected' : ''}>瀏覽器內建語音</option></select></label>
-      <span class="muted small">例句中 <span class="hit">橘色</span> 為本單字（含活用變化）</span>
+      <span class="muted small hint">例句中 <span class="hit">橘色</span> 為本單字（含活用變化）</span>
     </div>
-    <div id="wordList">
+    <div id="wordList" class="${words.length ? 'word-grid' : ''}">
       ${words.length ? words.map(wordCardHtml).join('') : `<div class="empty"><div class="big">📝</div>${q ? '找不到符合的單字' : '這個單元還沒有單字，點右上角「新增單字」開始吧！'}</div>`}
     </div>`;
 
@@ -525,6 +526,7 @@ function renderWords(root) {
     let ws = unitWords(u.id);
     const qq = state.search.trim();
     if (qq) ws = ws.filter((w) => [w.word, w.reading, w.meaning, w.note, ...(w.examples || []).map((x) => x.ja + x.zh)].join(' ').includes(qq));
+    list.className = ws.length ? 'word-grid' : '';
     list.innerHTML = ws.length ? ws.map(wordCardHtml).join('') : `<div class="empty">找不到符合的單字</div>`;
     bindWordCards(list);
   };
@@ -554,7 +556,7 @@ function wordCardHtml(w) {
       </div>
       <div class="word-actions">
         <button class="btn sm" data-speak="${esc(w.word)}">🔊</button>
-        <button class="btn sm" data-detail="${w.id}">🔍 查看詳情</button>
+        <button class="btn sm" data-detail="${w.id}">🔍 詳情</button>
         <button class="btn sm" data-edit="${w.id}">編輯</button>
         <button class="btn sm danger" data-delw="${w.id}">刪除</button>
       </div>
