@@ -8,7 +8,12 @@ fs.mkdirSync(out, { recursive: true });
 for (const f of fs.readdirSync(src)) {
   let content = fs.readFileSync(path.join(src, f));
   if (f === 'index.html') {
-    content = content.toString().replace('<script src="backend.js"></script>', '<script>window.N2_STATIC = true;</script>\n  <script src="backend.js"></script>');
+    const v = Date.now().toString(36); // 版本號：避免瀏覽器快取舊檔
+    content = content
+      .toString()
+      .replace('<script src="backend.js"></script>', '<script>window.N2_STATIC = true;</script>\n  <script src="backend.js?v=' + v + '"></script>')
+      .replace('<script src="app.js"></script>', '<script src="app.js?v=' + v + '"></script>')
+      .replace('href="style.css"', 'href="style.css?v=' + v + '"');
   }
   fs.writeFileSync(path.join(out, f), content);
 }
