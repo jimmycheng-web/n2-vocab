@@ -1,0 +1,15 @@
+# Render.com 一鍵部署設定（Blueprint）
+services:
+  - type: web
+    name: n2-vocab
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: APP_PASSWORD
+        sync: false            # 部署時在 Render 後台填入你的密碼
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

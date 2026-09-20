@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>N2 単語帳 — 日文 N2 單字學習平台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">N2</span>
+      <span class="brand-title">単語帳</span>
+    </div>
+    <nav class="nav">
+      <button data-view="units">📚 單元</button>
+      <button data-view="words">✏️ 單字</button>
+      <button data-view="review">🔁 複習</button>
+      <button data-view="quiz">📝 測驗</button>
+    </nav>
+    <div class="unit-picker">
+      <label for="unitSelect">目前單元</label>
+      <select id="unitSelect"></select>
+    </div>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel">
+      <button class="modal-close" title="關閉">✕</button>
+      <div class="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
