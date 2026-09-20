@@ -57,3 +57,19 @@ data/db.json     你的資料
 5. 把本機資料搬上去：本機「單元」頁 → 匯出 JSON → 到雲端網址 → 匯入 JSON。
 
 免費方案閒置 15 分鐘會休眠，之後第一次打開約需 30–60 秒喚醒（分詞器載入），之後就正常。
+
+## 部署到 GitHub Pages（純瀏覽器版，免伺服器）
+
+`docs/` 資料夾是可直接放上 GitHub Pages 的靜態版本（`npm run build:pages` 產生）：
+- 分詞 / 平假名：瀏覽器內載入 kuromoji（第一次約 17MB，之後快取）
+- 資料：存在瀏覽器 localStorage；在「單元」頁貼上 GitHub Token（gist 權限）即可透過私密 Gist 跨裝置同步
+- 辭典：Jotoba（英日、JLPT、例句）+ 日文 Wiktionary，皆支援跨網域
+- 發音：瀏覽器內建語音（Google 語音需經伺服器代理，靜態版不穩定）
+
+### 步驟
+1. 把專案 push 到 GitHub（public 或 private 皆可，Pages 對 private repo 需 GitHub Pro；免費帳號請用 public repo）。
+2. repo → **Settings → Pages → Build and deployment**：Source 選 *Deploy from a branch*，Branch 選 `main`、資料夾選 **`/docs`** → Save。
+3. 約 1 分鐘後網址為 `https://<你的帳號>.github.io/<repo 名稱>/`。
+4. 每台裝置打開網址 → 單元頁 → 貼上同一組 Token → 啟用同步。
+
+改了 `public/` 之後記得重新執行 `npm run build:pages` 再 push。

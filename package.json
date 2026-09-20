@@ -4,7 +4,8 @@
   "description": "JLPT N2 單字學習平台",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:pages": "node scripts/build-pages.js"
   },
   "dependencies": {
     "express": "^4.19.2",
