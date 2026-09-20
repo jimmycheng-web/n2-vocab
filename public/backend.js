@@ -30,8 +30,6 @@ const serverBackend = {
 };
 
 // ---------------- 純瀏覽器版（GitHub Pages） ----------------
-const KUROMOJI_JS = 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js';
-const KUROMOJI_DICT = 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/';
 // Jotoba（jotoba.de）：與 Jisho 同源（JMdict / Tatoeba），且支援跨網域，靜態版用它取代 Jisho / Tatoeba
 const JOTOBA = (path, body) => _json('https://jotoba.de/api/search/' + path, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language: 'English', no_english: false, ...body }),
@@ -47,25 +45,38 @@ const _posLabel = (p) => {
 const GIST_FILE = 'n2-vocab.json';
 const LS_DB = 'n2.db', LS_TOKEN = 'n2.gistToken', LS_GIST = 'n2.gistId', LS_SYNC = 'n2.lastSync';
 
-let _tokenizerPromise = null;
-function loadTokenizer(onStatus) {
-  if (_tokenizerPromise) return _tokenizerPromise;
-  _tokenizerPromise = new Promise((resolve, reject) => {
-    onStatus && onStatus('載入分詞程式…');
-    const s = document.createElement('script');
-    s.src = KUROMOJI_JS;
-    s.onerror = () => reject(new Error('無法載入 kuromoji'));
-    s.onload = () => {
-      onStatus && onStatus('載入日文字典（約 17MB，只需一次）…');
-      window.kuromoji.builder({ dicPath: KUROMOJI_DICT }).build((err, t) => {
-        if (err) return reject(err);
-        onStatus && onStatus('');
-        resolve(t);
-      });
-    };
-    document.head.appendChild(s);
-  }).catch((e) => { _tokenizerPromise = null; throw e; });
-  return _tokenizerPromise;
+// 分詞在 Web Worker 執行（下載 + 解壓 17MB 字典時不會凍結畫面）
+let _worker = null, _workerReady = false, _seq = 0;
+const _pending = new Map();
+function getWorker(onStatus) {
+  if (_worker) return _worker;
+  onStatus && onStatus('載入日文字典（約 17MB，只需一次）…');
+  _worker = new Worker('analyze-worker.js');
+  _worker.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === 'ready') { _workerReady = true; onStatus && onStatus(''); return; }
+    if (m.type === 'error') {
+      onStatus && onStatus('字典載入失敗：' + m.message);
+      _pending.forEach((p) => p.reject(new Error(m.message)));
+      _pending.clear();
+      _worker = null;
+      return;
+    }
+    const p = _pending.get(m.id);
+    if (!p) return;
+    _pending.delete(m.id);
+    m.error ? p.reject(new Error(m.error)) : p.resolve(m.tokens);
+  };
+  _worker.onerror = (e) => { onStatus && onStatus('字典載入失敗：' + e.message); _pending.forEach((p) => p.reject(new Error(e.message))); _pending.clear(); _worker = null; };
+  return _worker;
+}
+function tokenizeInWorker(text, onStatus) {
+  const w = getWorker(onStatus);
+  return new Promise((resolve, reject) => {
+    const id = ++_seq;
+    _pending.set(id, { resolve, reject });
+    w.postMessage({ id, text });
+  });
 }
 
 const gist = {
@@ -151,8 +162,8 @@ const staticBackend = {
   async analyze(text) {
     text = String(text || '').trim();
     if (!text) return { tokens: [], hiragana: '' };
-    const t = await loadTokenizer((msg) => { staticBackend.status = msg; _emitSync('dict:' + msg); });
-    const tokens = t.tokenize(text).map((tk) => {
+    const raw = await tokenizeInWorker(text, (msg) => { staticBackend.status = msg; _emitSync('dict:' + msg); });
+    const tokens = raw.map((tk) => {
       let reading = null;
       if (tk.reading) reading = _kataToHira(tk.reading);
       else if (_isKana(tk.surface_form)) reading = _kataToHira(tk.surface_form);
