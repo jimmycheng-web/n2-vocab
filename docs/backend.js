@@ -10,7 +10,9 @@ const _kataToHira = (s) => String(s || '').replace(/[ァ-ヶ]/g, (ch) => String.
 const _isKana = (s) => /^[぀-ヿー]+$/.test(s);
 
 async function _json(url, opts = {}) {
-  const r = await fetch(url, opts);
+  let r;
+  try { r = await fetch(url, opts); }
+  catch (e) { throw new Error(`無法連線到 ${new URL(url, location.href).host}（${e.message}；可能是網路、廣告阻擋擴充功能或 CORS 被擋）`); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || j.message || `HTTP ${r.status}`);
   return j;
@@ -115,7 +117,8 @@ const gist = {
     const f = g.files[GIST_FILE];
     if (!f) return null;
     let content = f.content;
-    if (f.truncated) content = await (await fetch(f.raw_url, { headers: this.headers() })).text();
+    // raw_url（gist.githubusercontent.com）不接受帶 Authorization 的跨網域預檢，會變成 Failed to fetch；網址本身已含存取權，直接抓即可
+    if (f.truncated) content = await (await fetch(f.raw_url)).text();
     return JSON.parse(content);
   },
   async push(db) {
