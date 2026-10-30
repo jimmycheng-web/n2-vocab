@@ -99,7 +99,7 @@ function speak(text) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   speechSynthesis && speechSynthesis.cancel();
   const engine = localStorage.getItem('n2.tts') || (N2_STATIC ? 'browser' : 'google');
-  if (engine === 'browser') return speakBrowser(text);
+  if (engine === 'browser' || !navigator.onLine) return speakBrowser(text);
   const a = new Audio();
   if (backend.ttsNoReferrer) a.referrerPolicy = 'no-referrer';
   a.src = backend.ttsUrl(text);
@@ -1217,6 +1217,7 @@ async function init() {
     }
   });
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service Worker 註冊失敗', e));
   if (N2_STATIC) {
     const ind = document.createElement('span');
     ind.id = 'syncInd'; ind.className = 'small muted';
