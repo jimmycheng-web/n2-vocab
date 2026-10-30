@@ -884,13 +884,22 @@ async function openDetail(id) {
 function renderReview(root) {
   const u = currentUnit();
   if (!u) { root.innerHTML = `<div class="empty"><div class="big">📚</div>請先建立並選擇一個單元。</div>`; return; }
-  const words = unitWords(u.id);
-  if (!words.length) { root.innerHTML = `<div class="empty"><div class="big">📝</div>「${esc(u.name)}」還沒有單字。</div>`; return; }
 
   if (!state.review) {
+    const scope = localStorage.getItem('n2.reviewScope') === 'all' ? 'all' : 'unit';
+    const words = scope === 'all' ? state.db.words : unitWords(u.id);
+    const scopeLabel = scope === 'all' ? '全部單元' : u.name;
+    const scopeField = `<label class="field"><span>範圍</span><select id="rScope"><option value="unit" ${scope === 'unit' ? 'selected' : ''}>目前單元：${esc(u.name)}（${unitWords(u.id).length}）</option><option value="all" ${scope === 'all' ? 'selected' : ''}>全部單元（${state.db.words.length}）</option></select></label>`;
+    const bindScope = () => { $('#rScope', root).onchange = (e) => { localStorage.setItem('n2.reviewScope', e.target.value); render(); }; };
+    if (!words.length) {
+      root.innerHTML = `<div class="card"><h2>🔁 複習</h2>${scopeField}<div class="empty"><div class="big">📝</div>「${esc(scopeLabel)}」還沒有單字。</div></div>`;
+      bindScope();
+      return;
+    }
     const weakCount = words.filter((w) => { const p = state.db.progress[w.id]; return p && (p.unknown > p.known || p.quizWrong > p.quizRight); }).length;
     root.innerHTML = `<div class="card">
-      <h2>🔁 複習：${esc(u.name)}</h2>
+      <h2>🔁 複習：${esc(scopeLabel)}</h2>
+      ${scopeField}
       <div class="grid2">
         <label class="field"><span>模式</span><select id="rMode"><option value="cards">字卡（翻面記憶）</option><option value="list">列表（點擊揭曉）</option></select></label>
         <label class="field"><span>字卡正面顯示</span><select id="rFront"><option value="word">日文單字 → 猜意思</option><option value="meaning">中文意思 → 猜單字</option><option value="reading">平假名 → 猜漢字與意思</option></select></label>
@@ -901,12 +910,13 @@ function renderReview(root) {
       </div>
       <div class="row" style="margin-top:16px"><button class="btn primary" id="rStart">開始複習（${words.length} 個單字）</button></div>
     </div>`;
+    bindScope();
     $('#rStart', root).onclick = () => {
       let list = words.slice();
       if ($('#rWeak', root).checked) list = list.filter((w) => { const p = state.db.progress[w.id]; return p && (p.unknown > p.known || p.quizWrong > p.quizRight); });
       if (!list.length) return toast('沒有符合條件的單字', true);
       if ($('#rShuffle', root).checked) list = shuffle(list);
-      state.review = { mode: $('#rMode', root).value, front: $('#rFront', root).value, queue: list.map((w) => w.id), idx: 0, flipped: false, known: [], unknown: [] };
+      state.review = { label: scopeLabel, mode: $('#rMode', root).value, front: $('#rFront', root).value, queue: list.map((w) => w.id), idx: 0, flipped: false, known: [], unknown: [] };
       render();
     };
     return;
@@ -936,7 +946,7 @@ function renderReview(root) {
     : `<div class="word-text">${esc(w.word)}</div><div class="badge">${esc(w.pos)}</div>`;
   root.innerHTML = `
     <div class="row between">
-      <div>${esc(u.name)}　<span class="muted">${r.idx + 1} / ${r.queue.length}</span></div>
+      <div>${esc(r.label || u.name)}　<span class="muted">${r.idx + 1} / ${r.queue.length}</span></div>
       <button class="btn sm ghost" id="rQuit">結束</button>
     </div>
     <div class="progressbar" style="margin:8px 0"><div style="width:${(r.idx / r.queue.length) * 100}%"></div></div>
@@ -977,7 +987,7 @@ function renderReviewList(root, r) {
   const u = currentUnit();
   root.innerHTML = `
     <div class="row between" style="margin-bottom:12px">
-      <h2 style="margin:0">🔁 ${esc(u.name)} 列表複習</h2>
+      <h2 style="margin:0">🔁 ${esc(r.label || u.name)} 列表複習</h2>
       <div class="row"><button class="btn sm" id="showAll">全部揭曉</button><button class="btn sm" id="hideAll">全部隱藏</button><button class="btn sm ghost" id="rQuit">結束</button></div>
     </div>
     <p class="small muted">點擊灰色區塊揭曉答案。</p>
