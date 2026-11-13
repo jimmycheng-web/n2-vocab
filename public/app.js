@@ -1008,6 +1008,7 @@ function renderReviewList(root, r) {
 }
 
 // ======================= 測驗頁 =======================
+const QUIZ_ALL_ID = '__all__'; // 全範圍測驗的成績紀錄用這個 unitId，不會算進任何單一單元
 const QUIZ_TYPES = [
   ['w2m', '看日文選中文'],
   ['m2w', '看中文選日文'],
@@ -1018,22 +1019,33 @@ const QUIZ_TYPES = [
 function renderQuiz(root) {
   const u = currentUnit();
   if (!u) { root.innerHTML = `<div class="empty"><div class="big">📚</div>請先建立並選擇一個單元。</div>`; return; }
-  const words = unitWords(u.id);
-  if (!words.length) { root.innerHTML = `<div class="empty"><div class="big">📝</div>「${esc(u.name)}」還沒有單字。</div>`; return; }
   const q = state.quiz;
 
   if (!q) {
-    const hist = state.db.quizHistory.filter((h) => h.unitId === u.id).slice(-5).reverse();
+    const scope = localStorage.getItem('n2.quizScope') === 'all' ? 'all' : 'unit';
+    const words = scope === 'all' ? state.db.words : unitWords(u.id);
+    const scopeLabel = scope === 'all' ? '全部單元' : u.name;
+    const histId = scope === 'all' ? QUIZ_ALL_ID : u.id;
+    const scopeField = `<label class="field"><span>範圍</span><select id="qRange"><option value="unit" ${scope === 'unit' ? 'selected' : ''}>目前單元：${esc(u.name)}（${unitWords(u.id).length}）</option><option value="all" ${scope === 'all' ? 'selected' : ''}>全部單元（${state.db.words.length}）</option></select></label>`;
+    const bindScope = () => { $('#qRange', root).onchange = (e) => { localStorage.setItem('n2.quizScope', e.target.value); render(); }; };
+    if (!words.length) {
+      root.innerHTML = `<div class="card"><h2>📝 測驗</h2>${scopeField}<div class="empty"><div class="big">📝</div>「${esc(scopeLabel)}」還沒有單字。</div></div>`;
+      bindScope();
+      return;
+    }
+    const hist = state.db.quizHistory.filter((h) => h.unitId === histId).slice(-5).reverse();
     root.innerHTML = `<div class="card">
-      <h2>📝 測驗：${esc(u.name)}</h2>
+      <h2>📝 測驗：${esc(scopeLabel)}</h2>
+      ${scopeField}
       <div class="checks" style="margin-bottom:12px">${QUIZ_TYPES.map(([k, n]) => `<label><input type="checkbox" class="qType" value="${k}" checked> ${n}</label>`).join('')}</div>
       <div class="grid2">
-        <label class="field"><span>題數（此單元共 ${words.length} 個單字）</span><input type="number" id="qCount" min="1" max="${Math.max(words.length * 2, 1)}" value="${Math.min(words.length, 20)}"></label>
-        <label class="field"><span>選項來源</span><select id="qScope"><option value="unit">只用本單元的單字當干擾選項</option><option value="all">用所有單元的單字當干擾選項</option></select></label>
+        <label class="field"><span>題數（${scope === 'all' ? '全部單元' : '此單元'}共 ${words.length} 個單字）</span><input type="number" id="qCount" min="1" max="${Math.max(words.length * 2, 1)}" value="${Math.min(words.length, 20)}"></label>
+        <label class="field"><span>選項來源</span><select id="qScope"><option value="unit">只用${scope === 'all' ? '測驗範圍內' : '本單元'}的單字當干擾選項</option><option value="all">用所有單元的單字當干擾選項</option></select></label>
       </div>
       <button class="btn primary" id="qStart">開始測驗</button>
     </div>
-    ${hist.length ? `<div class="card"><h3>最近成績</h3>${hist.map((h) => `<div class="small">${fmtDate(h.date)}　<b>${h.score} / ${h.total}</b>（${Math.round((h.score / h.total) * 100)}%）</div>`).join('')}</div>` : ''}`;
+    ${hist.length ? `<div class="card"><h3>最近成績（${esc(scopeLabel)}）</h3>${hist.map((h) => `<div class="small">${fmtDate(h.date)}　<b>${h.score} / ${h.total}</b>（${Math.round((h.score / h.total) * 100)}%）</div>`).join('')}</div>` : ''}`;
+    bindScope();
     $('#qStart', root).onclick = () => {
       const types = $$('.qType:checked', root).map((c) => c.value);
       if (!types.length) return toast('請至少選擇一種題型', true);
@@ -1041,7 +1053,7 @@ function renderQuiz(root) {
       const pool = $('#qScope', root).value === 'all' ? state.db.words : words;
       const questions = generateQuestions(words, pool, types, count);
       if (!questions.length) return toast('無法產生題目（例句填空需要有例句的單字）', true);
-      state.quiz = { questions, idx: 0, answered: null, results: [] };
+      state.quiz = { label: scopeLabel, histId, questions, idx: 0, answered: null, results: [] };
       render();
     };
     return;
@@ -1061,7 +1073,7 @@ function renderQuiz(root) {
 
   root.innerHTML = `
     <div class="row between">
-      <div>${esc(u.name)}　<span class="muted">第 ${q.idx + 1} / ${q.questions.length} 題</span></div>
+      <div>${esc(q.label || u.name)}　<span class="muted">第 ${q.idx + 1} / ${q.questions.length} 題</span></div>
       <button class="btn sm ghost" id="qQuit">放棄</button>
     </div>
     <div class="progressbar" style="margin:8px 0"><div style="width:${(q.idx / q.questions.length) * 100}%"></div></div>
@@ -1172,7 +1184,7 @@ function renderQuizResult(root, q) {
   const score = q.results.filter((r) => r.correct).length;
   if (!q.saved) {
     q.saved = true;
-    state.db.quizHistory.push({ unitId: u.id, date: Date.now(), score, total: q.results.length });
+    state.db.quizHistory.push({ unitId: q.histId || u.id, date: Date.now(), score, total: q.results.length });
     saveDb();
   }
   const wrong = q.results.filter((r) => !r.correct);
